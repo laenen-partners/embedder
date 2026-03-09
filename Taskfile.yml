@@ -1,0 +1,78 @@
+version: "3"
+
+# Environment is loaded via mise (see mise.toml).
+# Fallback: dotenv for environments without mise.
+dotenv: [".env"]
+
+tasks:
+  default:
+    desc: List available tasks
+    cmds:
+      - task --list-all
+
+  generate:
+    desc: Generate protobuf and connect-go code
+    cmds:
+      - buf generate
+
+  generate:apikey:
+    desc: Generate a cryptographically random API key
+    cmds:
+      - openssl rand -hex 32
+
+  lint:
+    desc: Lint protobuf definitions
+    cmds:
+      - buf lint
+
+  build:
+    desc: Build the embedder server binary
+    cmds:
+      - go build -o bin/embedder ./cmd/embedder
+
+  test:
+    desc: Run all tests
+    cmds:
+      - go test -v -count=1 ./...
+
+  test:cover:
+    desc: Run tests with coverage summary
+    cmds:
+      - go test -coverprofile=coverage.out -count=1 ./...
+
+  test:cover:html:
+    desc: Generate HTML coverage report and open in browser
+    cmds:
+      - go test -coverprofile=coverage.out -count=1 ./...
+      - go tool cover -html=coverage.out -o coverage.html
+      - open coverage.html
+
+  test:e2e:
+    desc: Run only e2e tests
+    cmds:
+      - go test -v -count=1 -run 'TestE2E_' ./...
+
+  test:e2e:googleai:
+    desc: Run Google AI live e2e tests (requires GOOGLE_API_KEY)
+    cmds:
+      - go test -v -count=1 -run 'TestE2E_GoogleAI' ./...
+
+  test:e2e:lmstudio:
+    desc: Run LM Studio live e2e tests (requires LMSTUDIO_URL and LMSTUDIO_EMBEDDER_MODEL)
+    cmds:
+      - go test -v -count=1 -run 'TestE2E_LMStudio' ./...
+
+  run:
+    desc: Run the server locally
+    cmds:
+      - go run ./cmd/embedder
+
+  clean:
+    desc: Remove build artifacts
+    cmds:
+      - rm -rf bin/
+
+  tidy:
+    desc: Tidy go modules
+    cmds:
+      - go mod tidy
