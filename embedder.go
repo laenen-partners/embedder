@@ -5,7 +5,11 @@ import (
 	"fmt"
 
 	"github.com/firebase/genkit/go/ai"
+	"github.com/firebase/genkit/go/core/api"
 	"github.com/firebase/genkit/go/genkit"
+	"github.com/firebase/genkit/go/plugins/googlegenai"
+
+	"github.com/laenen-partners/embedder/plugins/openaicompat"
 )
 
 // Embedder wraps a Genkit embedder to produce vector embeddings from text.
@@ -14,8 +18,35 @@ type Embedder struct {
 	model string
 }
 
-// NewEmbedder creates an Embedder that uses the given Genkit instance and model name.
-func NewEmbedder(g *genkit.Genkit, model string) *Embedder {
+// New creates an Embedder from environment variables and options.
+// It initialises Genkit with the appropriate plugins based on the resolved config.
+func New(ctx context.Context, opts ...Option) *Embedder {
+	cfg := NewConfig(opts...)
+
+	var plugins []api.Plugin
+	if cfg.GoogleAPIKey != "" {
+		plugins = append(plugins, &googlegenai.GoogleAI{APIKey: cfg.GoogleAPIKey})
+	}
+
+	if cfg.OpenAICompatURL != "" {
+		p := &openaicompat.Plugin{
+			Provider: cfg.OpenAICompatProvider,
+			BaseURL:  cfg.OpenAICompatURL,
+			APIKey:   cfg.OpenAICompatAPIKey,
+		}
+		if cfg.OpenAICompatModel != "" {
+			p.Embedders = []openaicompat.EmbedderDef{{Name: cfg.OpenAICompatModel}}
+		}
+		plugins = append(plugins, p)
+	}
+
+	g := genkit.Init(ctx, genkit.WithPlugins(plugins...))
+	return &Embedder{g: g, model: cfg.Model}
+}
+
+// NewFromGenkit creates an Embedder from an existing Genkit instance and model name.
+// Useful for testing with custom Genkit configurations.
+func NewFromGenkit(g *genkit.Genkit, model string) *Embedder {
 	return &Embedder{g: g, model: model}
 }
 

@@ -2,11 +2,7 @@ module github.com/laenen-partners/embedder
 
 go 1.25.0
 
-require (
-	connectrpc.com/connect v1.19.1
-	github.com/firebase/genkit/go v1.4.0
-	google.golang.org/protobuf v1.36.11
-)
+require github.com/firebase/genkit/go v1.4.0
 
 require (
 	cloud.google.com/go v0.120.0 // indirect
@@ -51,5 +47,6 @@ require (
 	google.golang.org/genai v1.41.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250603155806-513f23925822 // indirect
 	google.golang.org/grpc v1.73.0 // indirect
+	google.golang.org/protobuf v1.36.6 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

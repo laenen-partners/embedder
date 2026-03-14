@@ -1,64 +1,62 @@
 package embedder
 
-import (
-	"os"
-	"strconv"
-	"strings"
-)
+import "os"
 
-// Config holds settings for the embedder service.
+const defaultModel = "googleai/text-embedding-005"
+
+// Config holds settings for the embedder.
 type Config struct {
-	Model       string   // Genkit embedder model reference (e.g. "googleai/text-embedding-005")
-	APIKeys     []string // API keys for RPC authentication
-	RateLimit   float64  // requests per second per IP (0 = disabled)
-	RateBurst   int      // burst allowance per IP
-	CORSOrigins []string // allowed CORS origins (empty = no CORS)
+	Model                string // Genkit embedder model reference
+	GoogleAPIKey         string // Google AI API key
+	OpenAICompatURL      string // OpenAI-compatible server URL
+	OpenAICompatProvider string // Provider name prefix (default: "openaicompat")
+	OpenAICompatModel    string // Model name on the compatible server
+	OpenAICompatAPIKey   string // API key for the compatible server
 }
 
-// ConfigFromEnv reads configuration from environment variables.
-func ConfigFromEnv() Config {
-	model := os.Getenv("EMBEDDER_MODEL")
-	if model == "" {
-		model = "googleai/text-embedding-005"
-	}
+// Option configures the embedder. Options override environment variables.
+type Option func(*Config)
 
-	var apiKeys []string
-	if keys := os.Getenv("API_KEYS"); keys != "" {
-		for _, k := range strings.Split(keys, ",") {
-			if trimmed := strings.TrimSpace(k); trimmed != "" {
-				apiKeys = append(apiKeys, trimmed)
-			}
-		}
-	}
+// WithModel sets the embedding model reference.
+func WithModel(model string) Option {
+	return func(c *Config) { c.Model = model }
+}
 
-	rateLimit := 10.0
-	if v := os.Getenv("RATE_LIMIT"); v != "" {
-		if parsed, err := strconv.ParseFloat(v, 64); err == nil {
-			rateLimit = parsed
-		}
-	}
+// WithGoogleAPIKey sets the Google AI API key.
+func WithGoogleAPIKey(key string) Option {
+	return func(c *Config) { c.GoogleAPIKey = key }
+}
 
-	rateBurst := 20
-	if v := os.Getenv("RATE_BURST"); v != "" {
-		if parsed, err := strconv.Atoi(v); err == nil {
-			rateBurst = parsed
-		}
+// WithOpenAICompat configures an OpenAI-compatible embedding server.
+func WithOpenAICompat(url, provider, model, apiKey string) Option {
+	return func(c *Config) {
+		c.OpenAICompatURL = url
+		c.OpenAICompatProvider = provider
+		c.OpenAICompatModel = model
+		c.OpenAICompatAPIKey = apiKey
 	}
+}
 
-	var corsOrigins []string
-	if v := os.Getenv("CORS_ORIGINS"); v != "" {
-		for _, o := range strings.Split(v, ",") {
-			if trimmed := strings.TrimSpace(o); trimmed != "" {
-				corsOrigins = append(corsOrigins, trimmed)
-			}
-		}
+// NewConfig creates a Config populated from environment variables,
+// then applies any provided options on top.
+func NewConfig(opts ...Option) Config {
+	cfg := Config{
+		Model:                envOr("EMBEDDER_MODEL", defaultModel),
+		GoogleAPIKey:         os.Getenv("GOOGLE_API_KEY"),
+		OpenAICompatURL:      os.Getenv("OPENAI_COMPAT_URL"),
+		OpenAICompatProvider: envOr("OPENAI_COMPAT_PROVIDER", "openaicompat"),
+		OpenAICompatModel:    os.Getenv("OPENAI_COMPAT_MODEL"),
+		OpenAICompatAPIKey:   os.Getenv("OPENAI_COMPAT_API_KEY"),
 	}
+	for _, opt := range opts {
+		opt(&cfg)
+	}
+	return cfg
+}
 
-	return Config{
-		Model:       model,
-		APIKeys:     apiKeys,
-		RateLimit:   rateLimit,
-		RateBurst:   rateBurst,
-		CORSOrigins: corsOrigins,
+func envOr(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
 	}
+	return fallback
 }
