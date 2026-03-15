@@ -1,8 +1,15 @@
+// Package embedder provides text embedding via Firebase Genkit.
+//
+// Usage:
+//
+//	emb := embedder.New(ctx) // reads GOOGLE_API_KEY from env
+//	vectors, err := emb.Embed(ctx, []string{"hello world"})
 package embedder
 
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/firebase/genkit/go/ai"
 	"github.com/firebase/genkit/go/core/api"
@@ -12,40 +19,92 @@ import (
 	"github.com/laenen-partners/embedder/plugins/openaicompat"
 )
 
+const DefaultModel = "googleai/text-embedding-005"
+
 // Embedder wraps a Genkit embedder to produce vector embeddings from text.
 type Embedder struct {
 	g     *genkit.Genkit
 	model string
 }
 
-// New creates an Embedder from environment variables and options.
-// It initialises Genkit with the appropriate plugins based on the resolved config.
-func New(ctx context.Context, opts ...Option) *Embedder {
-	cfg := NewConfig(opts...)
+// Option configures an Embedder.
+type Option func(*options)
 
-	var plugins []api.Plugin
-	if cfg.GoogleAPIKey != "" {
-		plugins = append(plugins, &googlegenai.GoogleAI{APIKey: cfg.GoogleAPIKey})
+type options struct {
+	model                string
+	googleAPIKey         string
+	openAICompatURL      string
+	openAICompatProvider string
+	openAICompatModel    string
+	openAICompatAPIKey   string
+}
+
+// WithModel sets the Genkit embedder model reference (e.g. "googleai/text-embedding-005").
+// Defaults to DefaultModel, or EMBEDDER_MODEL env var if set.
+func WithModel(model string) Option {
+	return func(o *options) { o.model = model }
+}
+
+// WithGoogleAPIKey sets the Google AI API key.
+// Defaults to GOOGLE_API_KEY env var.
+func WithGoogleAPIKey(key string) Option {
+	return func(o *options) { o.googleAPIKey = key }
+}
+
+// WithOpenAICompat configures an OpenAI-compatible embedding server.
+func WithOpenAICompat(url, provider, model, apiKey string) Option {
+	return func(o *options) {
+		o.openAICompatURL = url
+		o.openAICompatProvider = provider
+		o.openAICompatModel = model
+		o.openAICompatAPIKey = apiKey
+	}
+}
+
+func envOr(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return fallback
+}
+
+// New creates an Embedder. It initialises Genkit with the appropriate plugins
+// based on environment variables and any provided options.
+func New(ctx context.Context, opts ...Option) *Embedder {
+	o := &options{
+		model:                envOr("EMBEDDER_MODEL", DefaultModel),
+		googleAPIKey:         os.Getenv("GOOGLE_API_KEY"),
+		openAICompatURL:      os.Getenv("OPENAI_COMPAT_URL"),
+		openAICompatProvider: envOr("OPENAI_COMPAT_PROVIDER", "openaicompat"),
+		openAICompatModel:    os.Getenv("OPENAI_COMPAT_MODEL"),
+		openAICompatAPIKey:   os.Getenv("OPENAI_COMPAT_API_KEY"),
+	}
+	for _, opt := range opts {
+		opt(o)
 	}
 
-	if cfg.OpenAICompatURL != "" {
+	var plugins []api.Plugin
+	if o.googleAPIKey != "" {
+		plugins = append(plugins, &googlegenai.GoogleAI{APIKey: o.googleAPIKey})
+	}
+	if o.openAICompatURL != "" {
 		p := &openaicompat.Plugin{
-			Provider: cfg.OpenAICompatProvider,
-			BaseURL:  cfg.OpenAICompatURL,
-			APIKey:   cfg.OpenAICompatAPIKey,
+			Provider: o.openAICompatProvider,
+			BaseURL:  o.openAICompatURL,
+			APIKey:   o.openAICompatAPIKey,
 		}
-		if cfg.OpenAICompatModel != "" {
-			p.Embedders = []openaicompat.EmbedderDef{{Name: cfg.OpenAICompatModel}}
+		if o.openAICompatModel != "" {
+			p.Embedders = []openaicompat.EmbedderDef{{Name: o.openAICompatModel}}
 		}
 		plugins = append(plugins, p)
 	}
 
 	g := genkit.Init(ctx, genkit.WithPlugins(plugins...))
-	return &Embedder{g: g, model: cfg.Model}
+	return &Embedder{g: g, model: o.model}
 }
 
 // NewFromGenkit creates an Embedder from an existing Genkit instance and model name.
-// Useful for testing with custom Genkit configurations.
+// Useful when you need full control over Genkit initialisation.
 func NewFromGenkit(g *genkit.Genkit, model string) *Embedder {
 	return &Embedder{g: g, model: model}
 }

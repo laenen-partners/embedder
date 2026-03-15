@@ -1,32 +1,20 @@
 # Embedder
 
-Pure Go module for generating text embeddings via Firebase Genkit.
+Go library for generating text embeddings via Firebase Genkit.
 
 ## Quick start
 
 ```sh
 mise install
-cp .env.sample .env
-# Set GOOGLE_API_KEY in .env
 task test
 ```
 
 ## Usage
 
 ```go
-emb := embedder.New(ctx)
-vectors, err := emb.Embed(ctx, []string{"hello world", "another text"})
-// vectors is [][]float32
-
-// With options
-emb := embedder.New(ctx, embedder.WithModel("lmstudio/nomic-embed-text-v1.5"))
+emb := embedder.New(ctx) // reads GOOGLE_API_KEY from env
+vectors, err := emb.Embed(ctx, []string{"hello world"})
 ```
-
-## Architecture
-
-- **Library:** `embedder.go` exposes `New(ctx, opts...) *Embedder` and `Embed(ctx, texts) ([][]float32, error)`
-- **No database** — purely stateless; callers store embeddings as needed
-- **Genkit** — uses `genkit.Embed()` with configurable embedding model
 
 ## Environment variables
 
@@ -43,6 +31,5 @@ emb := embedder.New(ctx, embedder.WithModel("lmstudio/nomic-embed-text-v1.5"))
 
 | File | Purpose |
 |---|---|
-| `embedder.go` | Core embedding logic, `New()` constructor |
-| `config.go` | `NewConfig()`, options pattern |
-| `plugins/openaicompat/openaicompat.go` | OpenAI-compatible embedding plugin |
+| `embedder.go` | `New()`, `Embed()` — core library API |
+| `plugins/openaicompat/` | Genkit plugin for OpenAI-compatible embeddings |
